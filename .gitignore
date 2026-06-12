@@ -1,0 +1,31 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# yolo runtime output
+app/runs/
+app/static/uploads/*
+app/static/results/*
+!app/static/uploads/.gitkeep
+!app/static/results/.gitkeep
+
+# logs
+*.log
+
+# os junk
+.DS_Store
+__MACOSX/
+
+# big archives
+_archive/
+
+# training dataset (model best.pt already trained)
+dataset/
+
+# laporan / report (not for public repo)
+laporan/
+
+# word lock files
+~$*.docx

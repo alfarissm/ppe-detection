@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPE MONITOR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c0e;
+            --panel: #111519;
+            --panel-2: #0e1216;
+            --line: #232a31;
+            --line-soft: #1a2026;
+            --text: #c7d1da;
+            --dim: #5d6b78;
+            --amber: #f5a623;
+            --red: #ff4d4d;
+            --green: #35d07f;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            font-size: 13px;
+            -webkit-font-smoothing: antialiased;
+        }
+        /* faint scanlines */
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                to bottom, rgba(255,255,255,0.015) 0 1px, transparent 1px 3px);
+            z-index: 99;
+        }
+
+        .u { text-transform: uppercase; letter-spacing: 0.16em; }
+
+        /* top status bar */
+        .bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 22px;
+            border-bottom: 1px solid var(--line);
+            background: var(--panel-2);
+        }
+        .bar .left { display: flex; align-items: center; gap: 18px; }
+        .title { color: var(--text); font-weight: 700; letter-spacing: 0.22em; }
+        .rec { color: var(--red); display: flex; align-items: center; gap: 7px; letter-spacing: 0.16em; }
+        .rec .dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: blink 1.3s steps(2,end) infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .bar .right { color: var(--dim); display: flex; gap: 20px; letter-spacing: 0.12em; }
+        .bar .right b { color: var(--amber); font-weight: 500; }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 0;
+        }
+
+        /* left: briefing */
+        .brief {
+            padding: 40px 34px;
+            border-right: 1px solid var(--line);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .brief .tag { color: var(--amber); margin-bottom: 22px; }
+        h1 {
+            font-size: 34px;
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: #eef3f7;
+        }
+        .lead { margin-top: 20px; max-width: 52ch; color: var(--dim); line-height: 1.7; }
+
+        .telemetry {
+            margin-top: 38px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border: 1px solid var(--line);
+        }
+        .tcell { padding: 16px; border-right: 1px solid var(--line); }
+        .tcell:last-child { border-right: 0; }
+        .tcell .k { color: var(--dim); font-size: 10px; }
+        .tcell .v { color: var(--text); font-size: 20px; font-weight: 600; margin-top: 6px; }
+
+        /* right: input feed */
+        .feed {
+            background: var(--panel);
+            padding: 26px 24px;
+            display: flex;
+            flex-direction: column;
+        }
+        .feed-head { display: flex; justify-content: space-between; color: var(--dim); margin-bottom: 16px; }
+        .feed-head .on { color: var(--green); }
+
+        .drop {
+            position: relative;
+            flex: 1;
+            min-height: 280px;
+            border: 1px solid var(--line);
+            background:
+                linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0/100% 26px,
+                var(--panel-2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            cursor: pointer;
+            transition: border-color .2s;
+        }
+        .drop:hover, .drop.drag { border-color: var(--amber); }
+        .drop .big { color: var(--text); letter-spacing: 0.16em; }
+        .drop .sub { color: var(--dim); margin-top: 10px; font-size: 11px; }
+        .drop .filename { display: none; margin-top: 14px; color: var(--amber); font-size: 11px; word-break: break-all; }
+        .corner { position: absolute; width: 12px; height: 12px; border: 1px solid var(--amber); }
+        .corner.tl { top: 8px; left: 8px; border-right: 0; border-bottom: 0; }
+        .corner.tr { top: 8px; right: 8px; border-left: 0; border-bottom: 0; }
+        .corner.bl { bottom: 8px; left: 8px; border-right: 0; border-top: 0; }
+        .corner.br { bottom: 8px; right: 8px; border-left: 0; border-top: 0; }
+        .preview { display: none; max-width: 100%; max-height: 260px; object-fit: contain; }
+
+        input[type="file"] { display: none; }
+
+        button {
+            margin-top: 18px;
+            padding: 15px;
+            border: 1px solid var(--amber);
+            background: transparent;
+            color: var(--amber);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            cursor: pointer;
+            transition: background .18s, color .18s;
+        }
+        button:hover { background: var(--amber); color: var(--bg); }
+        button:disabled { opacity: .5; cursor: wait; }
+
+        footer {
+            padding: 10px 22px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            color: var(--dim);
+            font-size: 10px;
+            letter-spacing: 0.14em;
+            background: var(--panel-2);
+        }
+
+        .overlay {
+            position: fixed; inset: 0;
+            background: rgba(10,12,14,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .overlay.on { display: flex; }
+        .overlay .lbl { color: var(--amber); letter-spacing: 0.3em; font-size: 16px; }
+        .scan { margin-top: 22px; width: 260px; height: 2px; background: var(--line); overflow: hidden; position: relative; }
+        .scan::after { content: ''; position: absolute; left: -40%; top: 0; width: 40%; height: 100%; background: var(--amber); animation: sweep 1s linear infinite; }
+        @keyframes sweep { to { left: 100%; } }
+
+        @media (max-width: 820px) {
+            main { grid-template-columns: 1fr; }
+            .brief { border-right: 0; border-bottom: 1px solid var(--line); padding: 32px 22px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bar">
+    <div class="left">
+        <span class="title">PPE·MONITOR</span>
+        <span class="rec u"><span class="dot"></span>STANDBY</span>
+    </div>
+    <div class="right u">
+        <span>UNIT·01</span>
+        <span>SYS <b>ONLINE</b></span>
+        <span id="clock">--:--:--</span>
+    </div>
+</div>
+
+<main>
+    <section class="brief">
+        <div class="tag u">// Construction Safety Vision · 3 Class Model</div>
+        <h1>Personal Protective<br>Equipment Detection</h1>
+        <p class="lead">
+            Muat citra lokasi kerja ke feed input. Sistem menjalankan inferensi
+            YOLO untuk memeriksa helm, rompi, dan sepatu, lalu menerbitkan status
+            kepatuhan beserta tingkat keyakinan per kelas.
+        </p>
+        <div class="telemetry">
+            <div class="tcell"><div class="k u">Classes</div><div class="v">03</div></div>
+            <div class="tcell"><div class="k u">Engine</div><div class="v">YOLO</div></div>
+            <div class="tcell"><div class="k u">Threshold</div><div class="v">0.25</div></div>
+        </div>
+    </section>
+
+    <section class="feed">
+        <div class="feed-head u">
+            <span>Input Feed</span>
+            <span class="on">● Ready</span>
+        </div>
+
+        <form id="form" action="/detect" method="POST" enctype="multipart/form-data">
+            <label class="drop" id="drop">
+                <span class="corner tl"></span><span class="corner tr"></span>
+                <span class="corner bl"></span><span class="corner br"></span>
+                <img class="preview" id="preview" alt="preview">
+                <span class="big u" id="dropTitle">Awaiting Input</span>
+                <span class="sub" id="dropSub">Drag citra atau klik untuk memuat berkas</span>
+                <span class="filename" id="filename"></span>
+                <input type="file" name="image" id="file" accept="image/*" required>
+            </label>
+            <button type="submit" id="submit">Run Inference</button>
+        </form>
+    </section>
+</main>
+
+<footer>
+    <span>PPE DETECTION SYSTEM · REV 03</span>
+    <span>FEED 640×640 · CONF 0.25</span>
+</footer>
+
+<div class="overlay" id="overlay">
+    <div class="lbl u">Processing</div>
+    <div class="scan"></div>
+</div>
+
+<script>
+    const file = document.getElementById('file');
+    const drop = document.getElementById('drop');
+    const preview = document.getElementById('preview');
+    const title = document.getElementById('dropTitle');
+    const sub = document.getElementById('dropSub');
+    const filename = document.getElementById('filename');
+    const form = document.getElementById('form');
+    const overlay = document.getElementById('overlay');
+    const submit = document.getElementById('submit');
+    const clock = document.getElementById('clock');
+
+    function tick() {
+        const d = new Date();
+        clock.textContent = d.toTimeString().slice(0, 8);
+    }
+    tick(); setInterval(tick, 1000);
+
+    function show(f) {
+        if (!f || !f.type.startsWith('image/')) return;
+        preview.src = URL.createObjectURL(f);
+        preview.style.display = 'block';
+        title.style.display = 'none';
+        sub.style.display = 'none';
+        filename.textContent = '> ' + f.name;
+        filename.style.display = 'block';
+    }
+
+    file.addEventListener('change', () => show(file.files[0]));
+    ['dragenter', 'dragover'].forEach(e =>
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(e =>
+        drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop', ev => {
+        const f = ev.dataTransfer.files[0];
+        if (f) { file.files = ev.dataTransfer.files; show(f); }
+    });
+
+    form.addEventListener('submit', () => {
+        if (!file.files.length) return;
+        submit.disabled = true;
+        overlay.classList.add('on');
+    });
+</script>
+
+</body>
+</html>
