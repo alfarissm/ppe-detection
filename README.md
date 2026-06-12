@@ -7,6 +7,20 @@ tingkat keyakinan deteksi per kelas.
 
 ![Screenshot aplikasi](docs/screenshot.png)
 
+---
+
+## Daftar Isi
+- [Fitur](#fitur)
+- [Cara Kerja](#cara-kerja)
+- [Dataset](#dataset)
+- [Training](#training)
+- [Hasil & Akurasi](#hasil--akurasi)
+- [Struktur Proyek](#struktur-proyek)
+- [Menjalankan](#menjalankan)
+- [Tech Stack](#tech-stack)
+
+---
+
 ## Fitur
 
 - Upload citra (drag-drop) lalu inferensi YOLO11 satu klik
@@ -15,21 +29,50 @@ tingkat keyakinan deteksi per kelas.
 - **Detection log** — jumlah objek + confidence + status per kelas
 - UI tema *dark console monitoring*, tanpa database, tanpa login
 
-## Model
+## Cara Kerja
 
-| Item | Nilai |
-|------|-------|
-| Arsitektur | YOLO11s (*small*) |
-| Parameter | 9.413.961 (±9,4 jt) · 21,3 GFLOPs |
-| Training | Transfer learning dari `yolo11s.pt`, 100 epoch |
-| Resolusi | 640×640 |
-| Kelas | `helmet`, `vest`, `shoes` (3 kelas) |
-| Dataset | Roboflow *ppe-detection-yolo* v3 — 400 citra |
-| Threshold inferensi | conf 0.25 |
+```
+Citra di-upload  →  YOLO11 (best.pt) prediksi  →  Hitung objek per kelas
+      →  Cek kelengkapan (helmet + vest + shoes)  →  Render verdict + log
+```
 
-## Akurasi (data validasi)
+1. Pengguna upload citra lewat dashboard.
+2. `model.predict(conf=0.25)` menghasilkan *bounding box* + label + confidence.
+3. Backend menghitung jumlah & rata-rata confidence tiap kelas.
+4. Verdict **Compliant** bila ketiga APD terdeteksi; selain itu **Non-Compliant**
+   dengan daftar APD yang hilang.
 
-**Keseluruhan:** Precision **0.558** · Recall **0.733** · mAP@0.5 **0.653** · mAP@0.5:0.95 **0.521**
+## Dataset
+
+Sumber: **Roboflow Universe** — proyek *ppe-detection-yolo* v3, format YOLO.
+
+| Split | Jumlah citra |
+|-------|:------------:|
+| Train | 369 |
+| Valid | 15 |
+| Test  | 16 |
+| **Total** | **400** |
+
+- **Pra-pemrosesan:** auto-orientation, resize 640×640
+- **Augmentasi:** horizontal flip (50%), brightness ±15%, Gaussian blur (0–1 px),
+  salt-and-pepper noise (0,1%)
+- **Kelas:** `0: helmet`, `1: shoes`, `2: vest`
+
+## Training
+
+| Konfigurasi | Nilai |
+|-------------|-------|
+| Base model | `yolo11s.pt` (pretrained, transfer learning) |
+| Arsitektur | YOLO11s — 101 layer, 9.413.961 param, 21,3 GFLOPs |
+| Epoch | 100 |
+| Image size | 640×640 |
+| Optimizer | default Ultralytics (auto) |
+| Output | `best.pt` (model terbaik) |
+
+## Hasil & Akurasi
+
+**Keseluruhan (data validasi):**
+Precision **0.558** · Recall **0.733** · mAP@0.5 **0.653** · mAP@0.5:0.95 **0.521**
 
 | Kelas | Precision | Recall | mAP@0.5 | mAP@0.5:0.95 |
 |--------|:---------:|:------:|:-------:|:------------:|
@@ -37,14 +80,36 @@ tingkat keyakinan deteksi per kelas.
 | vest   | 0.810 | 0.963 | **0.928** | 0.653 |
 | shoes  | 0.056 | 0.236 | **0.046** | 0.014 |
 
-**Catatan jujur:** model **sangat akurat** untuk *helmet* & *vest* (objek besar,
-kontras). Kelas *shoes* **lemah** (mAP@0.5 0.046) — objek kecil, sering tertutup,
-kontras rendah dengan tanah, banyak terklasifikasi sebagai *background*. Ini
-karakteristik umum *single-stage detector* pada objek kecil. Perbaikan ke depan:
-tambah data *shoes* beragam sudut + teknik objek kecil (tiling / resolusi lebih
-tinggi).
+### Precision–Recall Curve
+Kurva *helmet* (0.986) & *vest* (0.928) menempel pojok kanan-atas (ideal),
+sedangkan *shoes* (0.046) datar di bawah — menarik rata-rata mAP turun.
 
-## Struktur
+![Precision-Recall curve](docs/pr_curve.png)
+
+### F1–Confidence Curve
+Titik F1 optimal untuk kelas kuat berada di rentang confidence menengah.
+
+![F1 curve](docs/f1_curve.png)
+
+### Confusion Matrix (normalized)
+*helmet* & *vest* terklasifikasi benar dengan baik; kesalahan terkonsentrasi pada
+*shoes* yang banyak tertukar menjadi *background*.
+
+![Confusion matrix](docs/confusion_matrix.png)
+
+### Contoh Deteksi (validation batch)
+![Sample predictions](docs/sample_predictions.jpg)
+
+### Analisis
+- **helmet & vest — sangat baik.** Objek besar, kontras tinggi terhadap latar,
+  jumlah anotasi memadai.
+- **shoes — lemah (mAP@0.5 0.046).** Objek kecil, sering *occlusion*, kontras
+  rendah dengan permukaan tanah, dan data validasi terbatas (15 citra). Ini
+  karakteristik umum *single-stage detector* pada objek kecil.
+- **Perbaikan ke depan:** tambah variasi data *shoes* (sudut/jarak beragam),
+  pakai teknik objek kecil (tiling / resolusi lebih tinggi), tambah epoch.
+
+## Struktur Proyek
 
 ```
 .
@@ -54,10 +119,10 @@ tinggi).
 │  ├─ requirements.txt
 │  ├─ templates/         # dashboard.html, result.html
 │  └─ static/            # uploads & results (runtime)
-└─ docs/                 # screenshot
+└─ docs/                 # screenshot + grafik akurasi
 ```
 
-## Jalankan lokal
+## Menjalankan
 
 ```bash
 cd app
@@ -65,8 +130,8 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Buka http://127.0.0.1:5001
+Buka **http://127.0.0.1:5001**
 
-## Tech stack
+## Tech Stack
 
 Python · Flask · Ultralytics YOLO11 · PyTorch · OpenCV · Jinja2 · HTML/CSS/JS
