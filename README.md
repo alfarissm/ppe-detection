@@ -52,8 +52,6 @@ tinggi).
 │  ├─ app.py             # server + route /detect
 │  ├─ best.pt            # model YOLO11s terlatih
 │  ├─ requirements.txt
-│  ├─ Dockerfile         # deploy container / HF Spaces
-│  ├─ Procfile           # deploy Render / Railway
 │  ├─ templates/         # dashboard.html, result.html
 │  └─ static/            # uploads & results (runtime)
 └─ docs/                 # screenshot
@@ -68,17 +66,6 @@ python app.py
 ```
 
 Buka http://127.0.0.1:5001
-
-## Deploy (gratis)
-
-**Rekomendasi: HuggingFace Spaces (Docker)** — RAM/disk besar, muat torch + model.
-
-1. Buat Space baru → SDK **Docker** → Blank.
-2. Upload isi folder `app/` (termasuk `Dockerfile` & `best.pt`).
-3. Space auto-build & jalan di port 7860.
-
-Alternatif: **Render** (Web Service, free) pakai `Procfile`. Catatan: free tier
-512MB RAM bisa kurang untuk torch — HF Spaces lebih aman.
 
 ## Tech stack
 
