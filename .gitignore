@@ -25,6 +25,8 @@ _archive/
 
 # training dataset (model best.pt already trained)
 dataset/
+dataset_2class/
+training/best_new.pt
 
 # laporan / report (not for public repo)
 laporan/

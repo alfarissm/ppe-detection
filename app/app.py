@@ -28,8 +28,9 @@ def detect():
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
 
-    # Jalankan deteksi (hanya helmet & vest; shoes di-drop karena akurasi rendah)
-    results = model.predict(source=filepath, conf=0.25, save=True, classes=[0, 2])
+    # Jalankan deteksi (model 2 kelas: helmet & vest)
+    # conf 0.4: kurangi false positive (mis. topi biasa terdeteksi sebagai helmet)
+    results = model.predict(source=filepath, conf=0.4, save=True)
 
     # ← TAMBAH: Salin hasil deteksi ke static/results/
     result_dir = results[0].save_dir          

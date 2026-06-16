@@ -15,7 +15,6 @@ keyakinan deteksi per kelas.
 - [Dataset](#dataset)
 - [Training](#training)
 - [Hasil & Akurasi](#hasil--akurasi)
-- [Upaya Perbaikan Kelas Shoes](#upaya-perbaikan-kelas-shoes)
 - [Struktur Proyek](#struktur-proyek)
 - [Menjalankan](#menjalankan)
 - [Tech Stack](#tech-stack)
@@ -38,9 +37,7 @@ Citra di-upload  →  YOLO11 (best.pt) prediksi  →  Hitung objek per kelas
 ```
 
 1. Pengguna upload citra lewat dashboard.
-2. `model.predict(conf=0.25, classes=[0, 2])` menghasilkan *bounding box* +
-   label + confidence (hanya kelas helmet & vest; lihat
-   [Upaya Perbaikan Kelas Shoes](#upaya-perbaikan-kelas-shoes)).
+2. `model.predict(conf=0.4)` menghasilkan *bounding box* + label + confidence.
 3. Backend menghitung jumlah & rata-rata confidence tiap kelas.
 4. Verdict **Compliant** bila helmet & vest terdeteksi; selain itu
    **Non-Compliant** dengan daftar APD yang hilang.
@@ -59,87 +56,67 @@ Sumber: **Roboflow Universe** — proyek *ppe-detection-yolo* v3, format YOLO.
 - **Pra-pemrosesan:** auto-orientation, resize 640×640
 - **Augmentasi:** horizontal flip (50%), brightness ±15%, Gaussian blur (0–1 px),
   salt-and-pepper noise (0,1%)
-- **Kelas:** `0: helmet`, `1: shoes`, `2: vest` (dilatih 3 kelas; sistem akhir
-  pakai 2 kelas — helmet & vest)
+- **Kelas:** `0: helmet`, `1: vest`
 
 ## Training
 
 | Konfigurasi | Nilai |
 |-------------|-------|
 | Base model | `yolo11s.pt` (pretrained, transfer learning) |
-| Arsitektur | YOLO11s — 101 layer, 9.413.961 param, 21,3 GFLOPs |
+| Arsitektur | YOLO11s — 9,4 juta param, 21,3 GFLOPs |
 | Epoch | 100 |
 | Image size | 640×640 |
+| Batch | 16 |
 | Optimizer | default Ultralytics (auto) |
 | Output | `best.pt` (model terbaik) |
 
 ## Hasil & Akurasi
 
-Model dilatih untuk **3 kelas** (helmet, vest, shoes). Hasil validasi:
-
 **Keseluruhan (data validasi):**
-Precision **0.558** · Recall **0.733** · mAP@0.5 **0.653** · mAP@0.5:0.95 **0.521**
+Precision **0.961** · Recall **0.890** · mAP@0.5 **0.917** · mAP@0.5:0.95 **0.743**
 
 | Kelas | Precision | Recall | mAP@0.5 | mAP@0.5:0.95 |
 |--------|:---------:|:------:|:-------:|:------------:|
-| helmet | 0.807 | 1.000 | **0.986** | 0.896 |
-| vest   | 0.810 | 0.963 | **0.928** | 0.653 |
-| shoes  | 0.056 | 0.236 | **0.046** | 0.014 |
-
-Kelas **shoes sangat lemah** (mAP@0.5 0.046) sehingga **di-drop** dari sistem
-akhir. Dengan hanya helmet & vest, mAP@0.5 efektif **≈ 0.957**.
+| helmet | 1.000 | 0.896 | **0.925** | 0.815 |
+| vest   | 0.923 | 0.884 | **0.910** | 0.671 |
 
 ### Precision–Recall Curve
-Kurva *helmet* (0.986) & *vest* (0.928) menempel pojok kanan-atas (ideal),
-sedangkan *shoes* (0.046) datar di bawah — menarik rata-rata mAP turun.
+Kurva *helmet* (0.925) & *vest* (0.910) menempel pojok kanan-atas (ideal).
 
 ![Precision-Recall curve](docs/pr_curve.png)
 
 ### F1–Confidence Curve
-Titik F1 optimal untuk kelas kuat berada di rentang confidence menengah.
+Titik F1 optimal berada di rentang confidence menengah.
 
 ![F1 curve](docs/f1_curve.png)
 
 ### Confusion Matrix (normalized)
-*helmet* & *vest* terklasifikasi benar dengan baik; kesalahan terkonsentrasi pada
-*shoes* yang banyak tertukar menjadi *background*.
+*helmet* & *vest* terklasifikasi benar dengan baik; kesalahan minor terkonsentrasi
+pada *background*.
 
 ![Confusion matrix](docs/confusion_matrix.png)
 
 ### Contoh Deteksi (validation batch)
 ![Sample predictions](docs/sample_predictions.jpg)
 
-## Upaya Perbaikan Kelas Shoes
-
-Sebelum di-drop, kelas *shoes* dicoba diperbaiki. Penambahan data sudah mentok,
-jadi ditempuh **augmentasi agresif + resolusi tinggi** (mosaic, copy-paste,
-mixup, scale jitter; `imgsz=1024`, 150 epoch):
-
-| Kelas | mAP@0.5 (awal) | mAP@0.5 (augmentasi) |
-|--------|:--------------:|:--------------------:|
-| helmet | 0.986 | 0.986 |
-| vest   | 0.928 | 0.937 |
-| shoes  | 0.046 | 0.054 |
-
-Augmentasi **tidak menaikkan** *shoes* secara berarti (0.046 → 0.054, dalam
-rentang derau). Akar masalah = **kekurangan data** (validasi shoes hanya 1 citra),
-bukan konfigurasi training. Maka *shoes* di-drop; sistem fokus 2 kelas yang andal.
-
-**Perbaikan ke depan:** tambah data *shoes* (sudut/jarak beragam), pakai teknik
-objek kecil seperti *tiling*/SAHI atau resolusi lebih tinggi, lalu aktifkan
-kembali kelas *shoes*. Skrip retrain ada di `training/`.
+### Analisis
+- **helmet — sangat baik** (mAP@0.5 0.925, precision 1.000). Objek besar, kontras
+  tinggi terhadap latar, jumlah anotasi memadai.
+- **vest — baik** (mAP@0.5 0.910). Konsisten terdeteksi pada beragam pose & jarak.
+- **Perbaikan ke depan:** tambah variasi data (sudut/jarak/pencahayaan beragam),
+  uji teknik objek kecil (tiling / resolusi lebih tinggi), dan tambah epoch.
 
 ## Struktur Proyek
 
 ```
 .
 ├─ app/                  # aplikasi Flask
-│  ├─ app.py             # server + route /detect (2 kelas: helmet, vest)
-│  ├─ best.pt            # model YOLO11s terlatih (3 kelas, inferensi dibatasi 2)
+│  ├─ app.py             # server + route /detect
+│  ├─ best.pt            # model YOLO11s terlatih
 │  ├─ requirements.txt
 │  ├─ templates/         # dashboard.html, result.html
 │  └─ static/            # uploads & results (runtime)
-├─ training/             # skrip retrain (train.py, train.ipynb, data.yaml)
+├─ training/             # notebook + skrip training
 └─ docs/                 # screenshot + grafik akurasi
 ```
 
