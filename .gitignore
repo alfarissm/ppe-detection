@@ -6,6 +6,8 @@ venv/
 
 # yolo runtime output
 app/runs/
+training/runs/
+training/*.pt
 app/static/uploads/*
 app/static/results/*
 !app/static/uploads/.gitkeep

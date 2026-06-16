@@ -28,8 +28,8 @@ def detect():
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
 
-    # Jalankan deteksi
-    results = model.predict(source=filepath, conf=0.25, save=True)
+    # Jalankan deteksi (hanya helmet & vest; shoes di-drop karena akurasi rendah)
+    results = model.predict(source=filepath, conf=0.25, save=True, classes=[0, 2])
 
     # ← TAMBAH: Salin hasil deteksi ke static/results/
     result_dir = results[0].save_dir          
@@ -37,9 +37,9 @@ def detect():
     result_dst = os.path.join(RESULT_FOLDER, filename)  
     shutil.copy(result_src, result_dst)       
 
-    # Hitung objek + confidence rata-rata per kelas
-    helmet = shoes = vest = 0
-    conf_sum = {"helmet": 0.0, "shoes": 0.0, "vest": 0.0}
+    # Hitung objek + confidence rata-rata per kelas (helmet & vest)
+    helmet = vest = 0
+    conf_sum = {"helmet": 0.0, "vest": 0.0}
     names = model.names
 
     for box in results[0].boxes:
@@ -49,15 +49,12 @@ def detect():
         if label == "helmet":
             helmet += 1
             conf_sum["helmet"] += c
-        elif label == "shoes":
-            shoes += 1
-            conf_sum["shoes"] += c
         elif label == "vest":
             vest += 1
             conf_sum["vest"] += c
 
-    counts = {"helmet": helmet, "shoes": shoes, "vest": vest}
-    total = helmet + shoes + vest
+    counts = {"helmet": helmet, "vest": vest}
+    total = helmet + vest
 
     # Confidence rata-rata (persen) per kelas, 0 bila tak terdeteksi
     conf = {
@@ -65,15 +62,14 @@ def detect():
         for k in counts
     }
 
-    # Verdict kepatuhan: butuh helmet, vest, shoes
-    missing = [k for k in ("helmet", "vest", "shoes") if counts[k] == 0]
+    # Verdict kepatuhan: butuh helmet & vest
+    missing = [k for k in ("helmet", "vest") if counts[k] == 0]
     compliant = len(missing) == 0
 
     return render_template(
         "result.html",
         image=filename,       # filename yang sama dipakai untuk hasil
         helmet=helmet,
-        shoes=shoes,
         vest=vest,
         total=total,
         conf=conf,

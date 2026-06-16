@@ -189,7 +189,7 @@
             <div class="v u">{{ 'Compliant' if compliant else 'Non-Compliant' }}</div>
         </div>
         {% if compliant %}
-        <div class="miss ok u">Required PPE present<br><b>Helmet · Vest · Shoes</b></div>
+        <div class="miss ok u">Required PPE present<br><b>Helmet · Vest</b></div>
         {% else %}
         <div class="miss u">Missing detection<br><b>{{ missing | join(' · ') }}</b></div>
         {% endif %}
@@ -229,12 +229,6 @@
                     <td class="r num {{ 'zero' if not vest }}">{{ '%02d' % vest }}</td>
                     <td class="r conf">{{ '0.%02d' % conf.vest if conf.vest else '0.00' }}</td>
                     <td class="r"><span class="st {{ 'has' if vest else 'no' }}"><span class="led"></span>{{ 'OK' if vest else 'NONE' }}</span></td>
-                </tr>
-                <tr>
-                    <td class="name u">Shoes</td>
-                    <td class="r num {{ 'zero' if not shoes }}">{{ '%02d' % shoes }}</td>
-                    <td class="r conf">{{ '0.%02d' % conf.shoes if conf.shoes else '0.00' }}</td>
-                    <td class="r"><span class="st {{ 'has' if shoes else 'no' }}"><span class="led"></span>{{ 'OK' if shoes else 'NONE' }}</span></td>
                 </tr>
             </tbody>
         </table>

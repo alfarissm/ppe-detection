@@ -2,8 +2,8 @@
 
 Deteksi **Alat Pelindung Diri** (Personal Protective Equipment) pada citra lokasi
 kerja konstruksi menggunakan **YOLO11** + **Flask**. Sistem memeriksa kelengkapan
-*helmet*, *vest*, dan *shoes*, lalu menerbitkan **status kepatuhan** beserta
-tingkat keyakinan deteksi per kelas.
+*helmet* dan *vest*, lalu menerbitkan **status kepatuhan** beserta tingkat
+keyakinan deteksi per kelas.
 
 ![Screenshot aplikasi](docs/screenshot.png)
 
@@ -15,6 +15,7 @@ tingkat keyakinan deteksi per kelas.
 - [Dataset](#dataset)
 - [Training](#training)
 - [Hasil & Akurasi](#hasil--akurasi)
+- [Upaya Perbaikan Kelas Shoes](#upaya-perbaikan-kelas-shoes)
 - [Struktur Proyek](#struktur-proyek)
 - [Menjalankan](#menjalankan)
 - [Tech Stack](#tech-stack)
@@ -33,14 +34,16 @@ tingkat keyakinan deteksi per kelas.
 
 ```
 Citra di-upload  →  YOLO11 (best.pt) prediksi  →  Hitung objek per kelas
-      →  Cek kelengkapan (helmet + vest + shoes)  →  Render verdict + log
+      →  Cek kelengkapan (helmet + vest)  →  Render verdict + log
 ```
 
 1. Pengguna upload citra lewat dashboard.
-2. `model.predict(conf=0.25)` menghasilkan *bounding box* + label + confidence.
+2. `model.predict(conf=0.25, classes=[0, 2])` menghasilkan *bounding box* +
+   label + confidence (hanya kelas helmet & vest; lihat
+   [Upaya Perbaikan Kelas Shoes](#upaya-perbaikan-kelas-shoes)).
 3. Backend menghitung jumlah & rata-rata confidence tiap kelas.
-4. Verdict **Compliant** bila ketiga APD terdeteksi; selain itu **Non-Compliant**
-   dengan daftar APD yang hilang.
+4. Verdict **Compliant** bila helmet & vest terdeteksi; selain itu
+   **Non-Compliant** dengan daftar APD yang hilang.
 
 ## Dataset
 
@@ -56,7 +59,8 @@ Sumber: **Roboflow Universe** — proyek *ppe-detection-yolo* v3, format YOLO.
 - **Pra-pemrosesan:** auto-orientation, resize 640×640
 - **Augmentasi:** horizontal flip (50%), brightness ±15%, Gaussian blur (0–1 px),
   salt-and-pepper noise (0,1%)
-- **Kelas:** `0: helmet`, `1: shoes`, `2: vest`
+- **Kelas:** `0: helmet`, `1: shoes`, `2: vest` (dilatih 3 kelas; sistem akhir
+  pakai 2 kelas — helmet & vest)
 
 ## Training
 
@@ -71,6 +75,8 @@ Sumber: **Roboflow Universe** — proyek *ppe-detection-yolo* v3, format YOLO.
 
 ## Hasil & Akurasi
 
+Model dilatih untuk **3 kelas** (helmet, vest, shoes). Hasil validasi:
+
 **Keseluruhan (data validasi):**
 Precision **0.558** · Recall **0.733** · mAP@0.5 **0.653** · mAP@0.5:0.95 **0.521**
 
@@ -79,6 +85,9 @@ Precision **0.558** · Recall **0.733** · mAP@0.5 **0.653** · mAP@0.5:0.95 **0
 | helmet | 0.807 | 1.000 | **0.986** | 0.896 |
 | vest   | 0.810 | 0.963 | **0.928** | 0.653 |
 | shoes  | 0.056 | 0.236 | **0.046** | 0.014 |
+
+Kelas **shoes sangat lemah** (mAP@0.5 0.046) sehingga **di-drop** dari sistem
+akhir. Dengan hanya helmet & vest, mAP@0.5 efektif **≈ 0.957**.
 
 ### Precision–Recall Curve
 Kurva *helmet* (0.986) & *vest* (0.928) menempel pojok kanan-atas (ideal),
@@ -100,25 +109,37 @@ Titik F1 optimal untuk kelas kuat berada di rentang confidence menengah.
 ### Contoh Deteksi (validation batch)
 ![Sample predictions](docs/sample_predictions.jpg)
 
-### Analisis
-- **helmet & vest — sangat baik.** Objek besar, kontras tinggi terhadap latar,
-  jumlah anotasi memadai.
-- **shoes — lemah (mAP@0.5 0.046).** Objek kecil, sering *occlusion*, kontras
-  rendah dengan permukaan tanah, dan data validasi terbatas (15 citra). Ini
-  karakteristik umum *single-stage detector* pada objek kecil.
-- **Perbaikan ke depan:** tambah variasi data *shoes* (sudut/jarak beragam),
-  pakai teknik objek kecil (tiling / resolusi lebih tinggi), tambah epoch.
+## Upaya Perbaikan Kelas Shoes
+
+Sebelum di-drop, kelas *shoes* dicoba diperbaiki. Penambahan data sudah mentok,
+jadi ditempuh **augmentasi agresif + resolusi tinggi** (mosaic, copy-paste,
+mixup, scale jitter; `imgsz=1024`, 150 epoch):
+
+| Kelas | mAP@0.5 (awal) | mAP@0.5 (augmentasi) |
+|--------|:--------------:|:--------------------:|
+| helmet | 0.986 | 0.986 |
+| vest   | 0.928 | 0.937 |
+| shoes  | 0.046 | 0.054 |
+
+Augmentasi **tidak menaikkan** *shoes* secara berarti (0.046 → 0.054, dalam
+rentang derau). Akar masalah = **kekurangan data** (validasi shoes hanya 1 citra),
+bukan konfigurasi training. Maka *shoes* di-drop; sistem fokus 2 kelas yang andal.
+
+**Perbaikan ke depan:** tambah data *shoes* (sudut/jarak beragam), pakai teknik
+objek kecil seperti *tiling*/SAHI atau resolusi lebih tinggi, lalu aktifkan
+kembali kelas *shoes*. Skrip retrain ada di `training/`.
 
 ## Struktur Proyek
 
 ```
 .
 ├─ app/                  # aplikasi Flask
-│  ├─ app.py             # server + route /detect
-│  ├─ best.pt            # model YOLO11s terlatih
+│  ├─ app.py             # server + route /detect (2 kelas: helmet, vest)
+│  ├─ best.pt            # model YOLO11s terlatih (3 kelas, inferensi dibatasi 2)
 │  ├─ requirements.txt
 │  ├─ templates/         # dashboard.html, result.html
 │  └─ static/            # uploads & results (runtime)
+├─ training/             # skrip retrain (train.py, train.ipynb, data.yaml)
 └─ docs/                 # screenshot + grafik akurasi
 ```
 

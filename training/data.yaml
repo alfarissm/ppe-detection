@@ -1,0 +1,6 @@
+path: c:\Users\ASUS\Documents\Semester 6\Computer Vision\Projek_uas\dataset
+train: train/images
+val: valid/images
+test: test/images
+nc: 3
+names: [helmet, shoes, vest]
